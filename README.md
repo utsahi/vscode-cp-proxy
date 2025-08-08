@@ -29,3 +29,6 @@ authentication with the proxy.
 ## Known issue(s)
 1. If a model, e.g. Sonnet4 emits partial output and quits, try
    upgrading VS Code version.
+
+## demo - usage with emacs
+[UsageWithEmacs](./demo/vscode-cp-proxy.gif "Usage with Emacs")
