@@ -1,13 +1,14 @@
 {
     "name": "vscode-cp-proxy",
     "displayName": "VSCode CP Proxy",
+    "publisher": "KishorDatar", 
     "version": "0.0.1",
     "engines": {
         "vscode": ">=1.80.0"
     },
     "categories": [
         "AI",
-        "Other"
+        "Chat"
     ],
     "main": "./extension.js",
     "contributes": {},
