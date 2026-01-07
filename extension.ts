@@ -7,15 +7,6 @@ let server: http.Server | undefined;
 let tokenInfoInterval: NodeJS.Timeout | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-    const copilotExt = vscode.extensions.getExtension('GitHub.copilot');
-    if (!copilotExt) {
-        vscode.window.showErrorMessage('GitHub Copilot extension is required.');
-        return;
-    }
-    if (!copilotExt.isActive) {
-        vscode.window.showErrorMessage('GitHub Copilot extension is not yet active.');
-        return;
-    }
 
     const config = vscode.workspace.getConfiguration('vscodeCpProxy');
     const PORT = config.get<number>('port', 5555);
@@ -28,7 +19,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     server = http.createServer((req, res) => {
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        
+       
         const authHeader = req.headers['authorization'];
         const expectedToken = `Bearer ${token}`;
 
@@ -39,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
             res.end('Unauthorized', 'utf8');
             return;
         }
-        
+       
         tracer.info(req.url ?? "NO URL!");
         if (req.url === '/openai/v1/chat/completions') {
             let body = '';
@@ -54,7 +45,7 @@ export function activate(context: vscode.ExtensionContext) {
                 try {
                     payload = JSON.parse(body) as OpenAiRequestPayload;
 
-                    res.writeHead(200, { 
+                    res.writeHead(200, {
                         'Content-Type': payload.stream ? 'text/event-stream; charset=utf-8' : 'text/plain; charset=utf-8',
                         'Cache-Control': 'no-cache',
                         'Connection': 'keep-alive'
@@ -223,7 +214,7 @@ function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMe
     if (role === vscode.LanguageModelChatMessageRole.User) {
         if (toolCallResult) {
             let content = [new vscode.LanguageModelToolResultPart(
-                msg.tool_call_id, 
+                msg.tool_call_id,
                 [new vscode.LanguageModelTextPart(msg.content)]
             )];
             return {
@@ -249,7 +240,7 @@ function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMe
                     JSON.parse(t.args)
                 )
             );
-            
+           
             return {
                 role: role,
                 content: contents,
@@ -287,7 +278,7 @@ async function* openAiChat(reqId: string, payload: OpenAiRequestPayload, tracer:
 
     let requestOptions: vscode.LanguageModelChatRequestOptions = {
         tools: payload.tools?.
-	    filter((t) => t.type === "function")
+   filter((t) => t.type === "function")
             .map((f): vscode.LanguageModelChatTool => ({
                 name: f.function.name,
                 description: f.function.description,
@@ -310,7 +301,13 @@ async function* openAiChat(reqId: string, payload: OpenAiRequestPayload, tracer:
                 }
             }
             else{
-                throw new Error(`Unknown type ${typeof(chunk)}`);
+              if (chunk instanceof vscode.LanguageModelDataPart){
+                tracer.error("LanguageModelDataPart was received and ignored.");
+              }
+              else {
+                tracer.error("Unknown object was received and ignored.");
+                tracer.debug(() => "Unknown object was received and ignored: " + JSON.stringify(chunk));
+              }
             }
         }
         yield 'data: [DONE]\n\n\n';
