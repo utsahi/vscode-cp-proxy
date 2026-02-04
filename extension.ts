@@ -13,7 +13,7 @@ export function activate(context: vscode.ExtensionContext) {
     const HOST = config.get<string>('host', '127.0.0.1');
     const verbosity = config.get<string>('verbosity', 'info');
 
-    const token = new Date().toISOString();
+    const token = config.get<string>('token')?.trim() || new Date().toISOString();
     const output = vscode.window.createOutputChannel('vscode-cp-proxy');
     const tracer: ITracingOutputChannel = new TracingOutputChannelImpl(output, verbosity);
 

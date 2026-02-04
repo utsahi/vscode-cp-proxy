@@ -33,8 +33,32 @@
 (require 'gptel)
 (require 'url)
 
-(defvar vscode-cp-proxy-token nil)
-(defvar vscode-cp-proxy-host-port "127.0.0.1:5555")
+(defgroup vscode-cp-proxy nil
+  "The EmacSQL SQL database front-end."
+  :group 'vscode-cp-proxy)
+
+(defcustom vscode-cp-proxy-token nil
+  "Token to use for authentication with vscode-cp-proxy server.
+
+If nil ask for a token when activating.
+If a string, this token is used.
+
+The token can be found is vs code in the output panel (View > Output)
+in the vscode-cp-proxy log (choose via drop down menu)."
+  :type 'string
+  :group 'vscode-cp-proxy)
+
+(defcustom vscode-cp-proxy-host
+  "127.0.0.1"
+  "Host to communicate with the vscode-cp-proxy server."
+  :type 'string
+  :group 'vscode-cp-proxy)
+
+(defcustom vscode-cp-proxy-port
+  5555
+  "Port to communicate with the vscode-cp-proxy server."
+  :type 'integer
+  :group 'vscode-cp-proxy)
 
 (defun vscode-cp-proxy-set-token ()
   (interactive)
@@ -60,7 +84,7 @@
              ,(format "Bearer %s" vscode-cp-proxy-token))))
          (models-json
           (with-current-buffer
-              (url-retrieve-synchronously (format "http://%s/openai/v1/models" vscode-cp-proxy-host-port))
+              (url-retrieve-synchronously (format "http://%s:%s/openai/v1/models" vscode-cp-proxy-host vscode-cp-proxy-port))
             (beginning-of-buffer)
             (search-forward-regexp "\r?\n\r?\n")
             (json-parse-buffer)))
@@ -72,7 +96,7 @@
     (setq
      gptel-backend
      (gptel-make-openai "gptel-vscode-cp-proxy"
-       :host vscode-cp-proxy-host-port
+       :host (format "%s:%s" vscode-cp-proxy-host vscode-cp-proxy-port)
        :protocol "http"
        :endpoint "/openai/v1/chat/completions"
        :stream (not prefix)
