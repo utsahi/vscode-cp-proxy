@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
-import { OpenAiRequestPayload, OpenAiChatMessage } from './payload-schema';
+import { OpenAiRequestPayload, OpenAiChatMessage, OpenAiMessageContent } from './payload-schema';
 import { ITracingOutputChannel, TracingOutputChannelImpl } from './tracer';
 
 let server: http.Server | undefined;
@@ -203,6 +203,26 @@ async function fetchAllModels(tracer: ITracingOutputChannel): Promise<vscode.Lan
     return cachedModels;
 }
 
+function base64ToUint8Array(base64: string): Uint8Array {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+}
+
+function unpackDataUrl (dataUrl: string): { mimeType: string; base64Content: string } {
+    const match = dataUrl.match(/^data:(.*?);base64,(.+)$/);
+    if (!match) {
+        throw new Error("Invalid data URL format.");
+    }
+    return {
+        mimeType: match[1],
+        base64Content: match[2],
+    };
+};
+
 function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMessage{
     let toolCallResult = msg.role.toLocaleLowerCase() === "tool";
 
@@ -213,17 +233,42 @@ function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMe
 
     if (role === vscode.LanguageModelChatMessageRole.User) {
         if (toolCallResult) {
-            let content = [new vscode.LanguageModelToolResultPart(
-                msg.tool_call_id,
-                [new vscode.LanguageModelTextPart(msg.content)]
-            )];
-            return {
-                role: role,
-                content: content,
-                name: undefined,
-            };
+            if (typeof msg.content === 'string') {
+                let content = [new vscode.LanguageModelToolResultPart(
+                    msg.tool_call_id,
+                    [new vscode.LanguageModelTextPart(msg.content)]
+                )];
+                return {
+                    role: role,
+                    content: content,
+                    name: undefined,
+                };
+            }
+            else {
+                throw Error("Tool call result type is unknown.");
+            }
         } else {
-            let content = [new vscode.LanguageModelTextPart(msg.content)];
+            let content;
+            if (typeof msg.content === 'string') {
+                content = [new vscode.LanguageModelTextPart(msg.content)];
+            }
+            else {
+                content = msg.content.map((c) =>
+                    {
+                        if (c.type === "text") {
+                            return new vscode.LanguageModelTextPart(c.text);
+                        } else if (c.type === "image_url") {
+                            let unpackgedImage = unpackDataUrl(c.image_url.url);
+                            let arr = base64ToUint8Array(unpackgedImage.base64Content);
+                            return new vscode.LanguageModelDataPart(arr, unpackgedImage.mimeType);
+                        }
+                        else {
+                            throw Error("Unknown content element " + c.type);
+                        }
+                    }
+                );
+            }
+
             return {
                 role: role,
                 content: content,
@@ -248,14 +293,17 @@ function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMe
             };
         }
         else {
-            let msgContent = msg.content;
-            let textPart = [new vscode.LanguageModelTextPart(msgContent)];
+            if (typeof msg.content === 'string') {
+                let textPart = [new vscode.LanguageModelTextPart(msg.content)];
 
-            return {
-                role: role,
-                content: textPart,
-                name: undefined,
-            };
+                return {
+                    role: role,
+                    content: textPart,
+                    name: undefined,
+                };
+            } else {
+                throw Error("Unknown assistant role content ");
+            }
         }
     }
     else {

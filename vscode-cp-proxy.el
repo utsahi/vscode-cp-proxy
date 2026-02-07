@@ -101,7 +101,15 @@ in the vscode-cp-proxy log (choose via drop down menu)."
        :endpoint "/openai/v1/chat/completions"
        :stream (not prefix)
        :key 'vscode-cp-proxy-set-token
-       :models (mapcar 'intern models)
+       :models (seq-map
+                (lambda (m)
+                  `(,(intern m)
+                    :description
+                    ""
+                    :capabilities (media tool json url)
+                    :mime-types
+                    ("image/jpeg" "image/png" "image/gif" "image/webp")))
+                models)
        ))))
 
 (provide 'vscode-cp-proxy)
