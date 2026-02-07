@@ -1,23 +1,58 @@
 import * as vscode from 'vscode';
 import * as http from 'http';
+import { SecretStorage } from 'vscode';
 import { OpenAiRequestPayload, OpenAiChatMessage } from './payload-schema';
 import { ITracingOutputChannel, TracingOutputChannelImpl } from './tracer';
 
 let server: http.Server | undefined;
 let tokenInfoInterval: NodeJS.Timeout | undefined;
 
-export function activate(context: vscode.ExtensionContext) {
-
+export async function activate(context: vscode.ExtensionContext) {
+    const secrets: SecretStorage = context.secrets;
     const config = vscode.workspace.getConfiguration('vscodeCpProxy');
     const PORT = config.get<number>('port', 5555);
     const HOST = config.get<string>('host', '127.0.0.1');
     const verbosity = config.get<string>('verbosity', 'info');
+    const secretTokenKey = "authToken";
 
-    const token = config.get<string>('token')?.trim() || new Date().toISOString();
+    let tokenFromSecretStorage = false;
+    const defaultTokenFactory = () => new Date().toISOString();
+    let token = '';
+
+    let traceEndpointInfo = () =>
+        tracer.info(`Listening on http://${HOST}:${PORT}. ${tokenFromSecretStorage ? "Using token from the secret store." : "Use this auto generated (weak) token without quotes for auth: " + token}`);
+    
     const output = vscode.window.createOutputChannel('vscode-cp-proxy');
     const tracer: ITracingOutputChannel = new TracingOutputChannelImpl(output, verbosity);
 
+    let setTokenCommand = vscode.commands.registerCommand('vscodeCpProxy.setToken', async () => {
+        const inputToken = await vscode.window.showInputBox({
+            placeHolder: 'Enter the token for use during authentication.',
+            prompt: 'Enter the token for use during authentication.',
+            ignoreFocusOut: true
+        });
+        if (inputToken) {
+            await secrets.store(secretTokenKey, inputToken);
+            token = inputToken;
+            tokenFromSecretStorage = true;
+            vscode.window.showInformationMessage('Token set successfully.');
+        } 
+        traceEndpointInfo();
+    });
+    context.subscriptions.push(setTokenCommand);
+
+    let clearTokenCommand = vscode.commands.registerCommand('vscodeCpProxy.clearToken', async () => {
+        await secrets.delete(secretTokenKey);
+        token = defaultTokenFactory();
+        tokenFromSecretStorage = false;
+        vscode.window.showInformationMessage('Token cleared successfully.');
+        
+        traceEndpointInfo();
+    });
+    context.subscriptions.push(clearTokenCommand);
+    
     server = http.createServer((req, res) => {
+
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
        
         const authHeader = req.headers['authorization'];
@@ -106,15 +141,14 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     try {
-        const traceMessage = `Listening on http://${HOST}:${PORT}, use this (weak) token without quotes for auth: '${token}'`;
 
-        server.listen(PORT, HOST, () => {
-            tracer.info(traceMessage);
-        });
+        let secretToken = await secrets.get(secretTokenKey);
+        tokenFromSecretStorage = secretToken ? true : false;
+        token = config.get<string>('token')?.trim() || secretToken || defaultTokenFactory();
 
-        tokenInfoInterval = setInterval(() => {
-            tracer.info(traceMessage);
-        }, 5 * 60 * 1000);
+        server.listen(PORT, HOST, traceEndpointInfo);
+
+        tokenInfoInterval = setInterval(traceEndpointInfo, 5 * 60 * 1000);
 
     } catch (err) {
         tracer.error('Failed to start server: ' + (err instanceof Error ? err.message : String(err)));
