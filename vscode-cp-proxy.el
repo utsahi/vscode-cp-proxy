@@ -37,17 +37,20 @@
   "VS Code Copilot Proxy."
   :group 'vscode-cp-proxy)
 
-(defcustom vscode-cp-proxy-token nil
+(defvar vscode-cp-proxy-token nil
   "Token to use for authentication with vscode-cp-proxy server.
 
 If nil ask for a token when activating.
 If a string, this token is used.
 If a function, it should produce the token value.
 
-The token can be found is vs code in the output panel (View > Output)
-in the vscode-cp-proxy log (choose via drop down menu)."
-  :type '(choice  'string 'funtion)
-  :group 'vscode-cp-proxy)
+By default, the token can be found is vs code in the output panel (View > Output)
+in the vscode-cp-proxy log (choose via drop down menu).
+
+Alternatively, you can invoke command setToken in VS Code to permenantly
+set a token in VS Code.
+
+")
 
 (defcustom vscode-cp-proxy-host
   "127.0.0.1"
