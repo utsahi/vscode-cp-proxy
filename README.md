@@ -18,17 +18,23 @@ authentication with the proxy.
       2. Streams responses by default. Non-streaming behavior not
          tested.
       3. Supports tool calling.
+      4. Image support.
 
 ## Use with Emacs
 
 1. Load/require vscode-cp-proxy.el
 2. M-x vscode-cp-proxy-set-gptel-backend 
-   1. Enter the token obtained from output/vscode-cp-proxy from VS Code.
-   2. Choose from available models
-
-## Known issue(s)
-1. If a model, e.g. Sonnet4 emits partial output and quits, try
-   upgrading VS Code version.
+   1. You can generate a secure auth token and set it in VS Code by
+      executing the command setToken provided by this extension. The
+      token can then be stored in the authinfo gpg file and used in
+      Emacs -
+      ```
+        (setq vscode-cp-proxy-token (lambda () (cadr (auth-source-user-and-password "vscode-cp-proxy"))))
+      ```
+   2. By default, the extension will generate a new token on every
+      launch which can be obtained from output window by selecting
+      vscode-cp-proxy in VS Code.
+   3. Choose from available models
 
 ## demo - usage with emacs
 [UsageWithEmacs](./demo/vscode-cp-proxy.gif "Usage with Emacs")
