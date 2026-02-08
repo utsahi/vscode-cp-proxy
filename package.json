@@ -2,7 +2,7 @@
     "name": "vscode-cp-proxy",
     "displayName": "VSCode CP Proxy",
     "publisher": "KishorDatar", 
-    "version": "0.0.5",
+    "version": "0.0.7",
     "engines": {
         "vscode": ">=1.80.0"
     },
@@ -12,37 +12,47 @@
     ],
     "main": "./extension.js",
     "contributes": {
-      "configuration": {
-        "title": "VSCode CP Proxy settings",
-        "properties": {
-          "vscodeCpProxy.token": {
-            "type": "string",
-            "default": "",
-            "description": "Use with caution. Token to use for authentication. If empty string, use default."
-          },
-          "vscodeCpProxy.port": {
-            "type": "number",
-            "default": 5555,
-            "description": "Port to run the VSCode CP Proxy server on."
-          },
-          "vscodeCpProxy.host": {
-            "type": "string",
-            "default": "127.0.0.1",
-            "description": "Host interface to bind the VSCode CP Proxy server."
-          },
-        "vscodeCpProxy.verbosity": {
-          "type": "string",
-          "enum": [
-            "info",
-            "debug",
-            "error",
-            "none"
-          ],
-          "default": "info",
-          "description": "Output verbosity for VSCode CP Proxy tracing."
-        }
-      }
-      }
+        "configuration": {
+            "title": "VSCode CP Proxy settings",
+            "properties": {
+                "vscodeCpProxy.token": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Use with caution. Token to use for authentication. If empty string, use default."
+                },
+                "vscodeCpProxy.port": {
+                    "type": "number",
+                    "default": 5555,
+                    "description": "Port to run the VSCode CP Proxy server on."
+                },
+                "vscodeCpProxy.host": {
+                    "type": "string",
+                    "default": "127.0.0.1",
+                    "description": "Host interface to bind the VSCode CP Proxy server."
+                },
+                "vscodeCpProxy.verbosity": {
+                    "type": "string",
+                    "enum": [
+                        "info",
+                        "debug",
+                        "error",
+                        "none"
+                    ],
+                    "default": "info",
+                    "description": "Output verbosity for VSCode CP Proxy tracing."
+                }
+            }
+        },
+        "commands": [
+            {
+                "command": "vscodeCpProxy.setToken",
+                "title": "VS Code CP Proxy: Set Token"
+            },
+            {
+                "command": "vscodeCpProxy.clearToken",
+                "title": "VS Code CP Proxy: Clear Token"
+            }
+        ]
     },
     "activationEvents": [
         "onStartupFinished"

@@ -34,19 +34,23 @@
 (require 'url)
 
 (defgroup vscode-cp-proxy nil
-  "The EmacSQL SQL database front-end."
+  "VS Code Copilot Proxy."
   :group 'vscode-cp-proxy)
 
-(defcustom vscode-cp-proxy-token nil
+(defvar vscode-cp-proxy-token nil
   "Token to use for authentication with vscode-cp-proxy server.
 
 If nil ask for a token when activating.
 If a string, this token is used.
+If a function, it should produce the token value.
 
-The token can be found is vs code in the output panel (View > Output)
-in the vscode-cp-proxy log (choose via drop down menu)."
-  :type 'string
-  :group 'vscode-cp-proxy)
+By default, the token can be found is vs code in the output panel (View > Output)
+in the vscode-cp-proxy log (choose via drop down menu).
+
+Alternatively, you can invoke command setToken in VS Code to permenantly
+set a token in VS Code.
+
+")
 
 (defcustom vscode-cp-proxy-host
   "127.0.0.1"
@@ -62,26 +66,25 @@ in the vscode-cp-proxy log (choose via drop down menu)."
 
 (defun vscode-cp-proxy-set-token ()
   (interactive)
-  
-  (when (or (called-interactively-p 'any) (not vscode-cp-proxy-token))
-    (setq
-     vscode-cp-proxy-token
-     (string-replace
-      "'"
-      ""
-      (string-trim (read-from-minibuffer "Enter the token. (I'll remove the quotes.) ")))))
-  
-  vscode-cp-proxy-token)
+
+  (if (functionp vscode-cp-proxy-token)
+      (or (apply vscode-cp-proxy-token nil) (error "No token was produced by 'vscode-cp-proxy-token"))
+      (when (or (called-interactively-p 'any) (not vscode-cp-proxy-token))
+        (setq
+         vscode-cp-proxy-token
+         (string-replace
+          "'"
+          ""
+          (string-trim (read-from-minibuffer "Enter the token. (I'll remove the quotes.) "))))
+        vscode-cp-proxy-token)))
 
 (defun vscode-cp-proxy-set-gptel-backend (prefix)
   (interactive "P")
 
-  (call-interactively 'vscode-cp-proxy-set-token)
-
-  (let* (
+  (let* ((token (call-interactively 'vscode-cp-proxy-set-token))
          (url-request-extra-headers
           `(("Authorization" .
-             ,(format "Bearer %s" vscode-cp-proxy-token))))
+             ,(format "Bearer %s" token))))
          (models-json
           (with-current-buffer
               (url-retrieve-synchronously (format "http://%s:%s/openai/v1/models" vscode-cp-proxy-host vscode-cp-proxy-port))
