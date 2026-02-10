@@ -2,10 +2,10 @@
 
 A proxy server/adapter layer that relays requests to VS Code APIs.
 
-Listens at localhost:5555 by default.
-
-Open output/vscode-cp-proxy for authentication token for client
-authentication with the proxy.
+Listens at localhost:5555 by default. For authentication, open
+output/vscode-cp-proxy for authentication token, or, set your own
+token using command setToken provided by this extension by pressing
+(Ctrl+Shift+P) in VS Code.
 
 ## Currently supported endpoints:
 
@@ -24,10 +24,7 @@ authentication with the proxy.
 
 1. Load/require vscode-cp-proxy.el
 2. M-x vscode-cp-proxy-set-gptel-backend 
-   1. You can generate a secure auth token and set it in VS Code by
-      executing the command setToken provided by this extension. The
-      token can then be stored in the authinfo gpg file and used in
-      Emacs -
+   1. If using a custom token, you can store it in the authinfo gpg file and configure as:
       ```
         (setq vscode-cp-proxy-token (lambda () (cadr (auth-source-user-and-password "vscode-cp-proxy"))))
       ```
