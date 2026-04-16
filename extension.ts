@@ -69,12 +69,18 @@ export async function activate(context: vscode.ExtensionContext) {
        
         tracer.info(req.url ?? "NO URL!");
         if (req.url === '/openai/v1/chat/completions') {
-            let body = '';
+            const chunks: Buffer[] = [];
             req.on('data', (chunk) => {
-                body += chunk.toString();
+                chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
             });
             req.on('end', async () => {
-                tracer.info(`Request length ${Buffer.byteLength(body, 'utf8')} bytes.`);
+                const decoded = decodeRequestBody(req, chunks, tracer);
+                if (!decoded.ok) {
+                    res.writeHead(decoded.status ?? 500, { 'Content-Type': 'text/plain; charset=utf-8' });
+                    res.end(decoded.message || '', 'utf8');
+                    return;
+                }
+                const body = decoded.body!;
                 let payload: OpenAiRequestPayload;
                 let wroteHead = false;
                 let id: string = "request-id";
@@ -239,12 +245,8 @@ async function fetchAllModels(tracer: ITracingOutputChannel): Promise<vscode.Lan
 }
 
 function base64ToUint8Array(base64: string): Uint8Array {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
+    const buf = Buffer.from(base64, 'base64');
+    return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
 function unpackDataUrl (dataUrl: string): { mimeType: string; base64Content: string } {
@@ -257,6 +259,50 @@ function unpackDataUrl (dataUrl: string): { mimeType: string; base64Content: str
         base64Content: match[2],
     };
 };
+
+function parseContentType(contentTypeHeader: string | undefined): { mimeType: string; charset?: string } {
+    const header = String(contentTypeHeader || '').trim();
+    if (header === '') return { mimeType: 'application/octet-stream' };
+    const parts = header.split(';').map(p => p.trim());
+    const mimeType = (parts[0] || 'application/octet-stream').toLowerCase();
+    let charset: string | undefined;
+    for (let i = 1; i < parts.length; i++) {
+        const m = /^charset=(.+)$/i.exec(parts[i]);
+        if (m) {
+            charset = m[1].trim().toLowerCase();
+            break;
+        }
+    }
+    return { mimeType, charset };
+}
+
+function isTextLike(mimeType: string): boolean {
+    return mimeType.startsWith('text/')
+        || mimeType === 'application/json'
+        || mimeType.endsWith('+json')
+        || mimeType === 'application/x-www-form-urlencoded';
+}
+
+function decodeRequestBody(req: http.IncomingMessage, chunks: Buffer[], tracer: ITracingOutputChannel): { ok: boolean; body?: string; status?: number; message?: string } {
+    const bodyBuffer = Buffer.concat(chunks);
+
+    const { mimeType, charset } = parseContentType(req.headers['content-type']);
+    const effectiveCharset = charset ?? 'utf-8';
+
+    if (!isTextLike(mimeType)) {
+        tracer.warn(`Received unsupported content-type '${mimeType}'. Only JSON/text content is accepted.`);
+        return { ok: false, status: 415, message: 'Unsupported Media Type' };
+    }
+
+    if (effectiveCharset !== 'utf-8' && effectiveCharset !== 'utf8') {
+        tracer.warn(`Unsupported charset '${effectiveCharset}'.`);
+        return { ok: false, status: 415, message: `Unsupported charset: ${effectiveCharset}` };
+    }
+
+    const body = bodyBuffer.toString('utf8');
+    tracer.info(`Request length ${Buffer.byteLength(body, 'utf8')} bytes.`);
+    return { ok: true, body };
+}
 
 function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMessage{
     let toolCallResult = msg.role.toLocaleLowerCase() === "tool";
