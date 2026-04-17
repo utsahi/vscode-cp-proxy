@@ -228,20 +228,12 @@ export function deactivate() {
     }
 }
 
-let cachedModels: vscode.LanguageModelChat[] = [];
-let cacheLastUpdated: number = 0;
 async function fetchAllModels(tracer: ITracingOutputChannel): Promise<vscode.LanguageModelChat[]> {
-    const now = Date.now();
-
-    if (now - cacheLastUpdated > 30 * 60 * 1000) {
-        tracer.info("Updating models cache...");
-        cachedModels = await vscode.lm.selectChatModels();
-        cachedModels.forEach((m) => tracer.info("Model.id: " + m.id));
-        cacheLastUpdated = now;
-    }
-
-    tracer.info("Returning from models cache...");
-    return cachedModels;
+    
+    tracer.info("Fetching models...");
+    const models = await vscode.lm.selectChatModels();
+    models.forEach((m) => tracer.info("Model.id: " + m.id));
+    return models;
 }
 
 function base64ToUint8Array(base64: string): Uint8Array {
@@ -398,9 +390,10 @@ async function* openAiChat(reqId: string, payload: OpenAiRequestPayload, tracer:
 
     tracer.debug(() => JSON.stringify(messages));
 
-    const allModels = await fetchAllModels(tracer);
-    let matchedModel = allModels.find((m) => m.id === payload.model);
+    const matchedModels = await vscode.lm.selectChatModels({ id: payload.model });
+    const matchedModel = matchedModels && matchedModels.length > 0 ? matchedModels[0] : undefined;
     if (!matchedModel) {
+        const allModels = await fetchAllModels(tracer);
         const availableModelIds = allModels.map((m) => m.id);
         throw new Error(`Model '${payload.model}' not found. Available models: ${availableModelIds.join(', ')}`);
     }
