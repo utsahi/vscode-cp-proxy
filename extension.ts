@@ -400,7 +400,7 @@ async function* openAiChat(reqId: string, payload: OpenAiRequestPayload, tracer:
 
     let requestOptions: vscode.LanguageModelChatRequestOptions = {
         tools: payload.tools?.
-   filter((t) => t.type === "function")
+            filter((t) => t.type === "function")
             .map((f): vscode.LanguageModelChatTool => ({
                 name: f.function.name,
                 description: f.function.description,
