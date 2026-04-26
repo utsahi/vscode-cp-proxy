@@ -97,11 +97,8 @@ set a token in VS Code.
            (lambda (e)
              (let* ((id (gethash "id" e))
                     (name (or (gethash "name" e) ""))
-                    (maxTokens (or (gethash "maxTokens" e) (gethash "max_input_tokens" e) 0))
-                    (family (or (gethash "family" e) ""))
-                    (vendor (or (gethash "vendor" e) ""))
-                    (version (or (gethash "version" e) "")))
-               (format "%s | name=%s | maxTokens=%s | family=%s | vendor=%s | version=%s" id name maxTokens family vendor version)))
+                    (maxTokens (or (gethash "maxTokens" e) (gethash "max_input_tokens" e) 0)))
+               (format "%s | name=%s | maxTokens=%s" id name maxTokens)))
            models-data))
          (model-ids
           (seq-map (lambda (e) (gethash "id" e)) models-data)))
