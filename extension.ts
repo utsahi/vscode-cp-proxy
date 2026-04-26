@@ -125,6 +125,11 @@ export async function activate(context: vscode.ExtensionContext) {
                 const now = Math.floor(Date.now() / 1000);
                 const data = models.map((m, idx) => ({
                     id: m.id,
+                    name: m.name,
+                    vendor: m.vendor,
+                    family: m.family,
+                    version: m.version,
+                    maxTokens: typeof m.maxInputTokens === 'number' ? m.maxInputTokens : undefined,
                     object: "model",
                     created: now,
                     owned_by: "organization-owner"

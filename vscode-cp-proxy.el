@@ -91,11 +91,23 @@ set a token in VS Code.
             (beginning-of-buffer)
             (search-forward-regexp "\r?\n\r?\n")
             (json-parse-buffer)))
-         (models (seq-map
-                  (lambda (e) (gethash "id" e))
-                  (gethash "data" models-json))))
-    (setq gptel-model
-          (intern (completing-read "Select model: " models nil t)))
+         (models-data (gethash "data" models-json))
+         (model-displays
+          (seq-map
+           (lambda (e)
+             (let* ((id (gethash "id" e))
+                    (name (or (gethash "name" e) ""))
+                    (maxTokens (or (gethash "maxTokens" e) (gethash "max_input_tokens" e) 0))
+                    (family (or (gethash "family" e) ""))
+                    (vendor (or (gethash "vendor" e) ""))
+                    (version (or (gethash "version" e) "")))
+               (format "%s | name=%s | maxTokens=%s | family=%s | vendor=%s | version=%s" id name maxTokens family vendor version)))
+           models-data))
+         (model-ids
+          (seq-map (lambda (e) (gethash "id" e)) models-data)))
+    (let* ((selection (completing-read "Select model: " model-displays nil t))
+           (selected-id (car (split-string selection " |"))))
+      (setq gptel-model (intern selected-id)))
     (setq
      gptel-backend
      (gptel-make-openai "gptel-vscode-cp-proxy"
@@ -112,7 +124,7 @@ set a token in VS Code.
                     :capabilities (media tool json url)
                     :mime-types
                     ("image/jpeg" "image/png" "image/gif" "image/webp")))
-                models)
+                model-ids)
        ))))
 
 (provide 'vscode-cp-proxy)
