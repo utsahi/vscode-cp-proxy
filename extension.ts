@@ -356,13 +356,32 @@ function composeChatMessage(msg: OpenAiChatMessage) : vscode.LanguageModelChatMe
     }
     else if (role == vscode.LanguageModelChatMessageRole.Assistant) {
         if (!msg.content) {
-            let contents = msg.tool_calls.map((t) =>
-                new vscode.LanguageModelToolCallPart(
+            let contents = msg.tool_calls.map((t) => {
+                if (t.type !== undefined && t.type !== "function") {
+                    throw new Error(
+                        `Unsupported tool_call type '${t.type}' for tool_call id '${t.id}'. ` +
+                        `Only 'function' tool calls are supported. ` +
+                        `Update your client to send tool_calls with type='function'.`
+                    );
+                }
+                const name = t.function?.name ?? t.name;
+                if (!name) {
+                    throw new Error(
+                        `Missing tool name in assistant tool_call (id '${t.id}'). ` +
+                        `Expected either 'function.name' (standard OpenAI shape) or top-level 'name'. ` +
+                        `Check your client's tool_call serialization.`
+                    );
+                }
+                const rawArgs = t.function?.arguments ?? t.args;
+                const parsedArgs = (rawArgs === undefined || rawArgs === null || rawArgs === "")
+                    ? {}
+                    : (typeof rawArgs === "string" ? JSON.parse(rawArgs) : rawArgs);
+                return new vscode.LanguageModelToolCallPart(
                     t.id,
-                    t.name,
-                    JSON.parse(t.args)
-                )
-            );
+                    name,
+                    parsedArgs
+                );
+            });
            
             return {
                 role: role,

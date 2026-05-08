@@ -1,7 +1,12 @@
 export interface OpenAiToolCall {
     id: string,
-    name: string,
-    args: string,
+    type?: string,
+    name?: string,
+    args?: string,
+    function?: {
+        name: string,
+        arguments: string,
+    },
 }
 
 export interface OpenAiMessageContent
