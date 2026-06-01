@@ -177,12 +177,12 @@ function toOpenAICompletionChunk(id: string, content: string, finish: boolean) {
     return JSON.stringify({
             id: id,
             object: "chat.completion.chunk",
-            finish_reason: finish ? "stop" : null,
             choices: [
                 {
                     delta: {
                         content: content,
                     },
+                    finish_reason: finish ? "stop" : null,
                 },
             ],
     });
@@ -456,7 +456,9 @@ async function* openAiChat(reqId: string, payload: OpenAiRequestPayload, tracer:
               }
             }
         }
-        yield 'data: [DONE]\n\n\n';
+        // Send a final chunk with finish_reason so clients expecting OpenAI-style closure can detect why the stream ended.
+        yield 'data: ' + toOpenAICompletionChunk(reqId, "", true) + '\n\n';
+        yield 'data: [DONE]\n\n';
     } else {
         let text = "";
         for await (const chunk of response.stream) {
