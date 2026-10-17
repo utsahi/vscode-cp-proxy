@@ -231,46 +231,23 @@ Returns a list of (MODEL-NAME . DISPLAY) pairs."
              (vscode-cp-proxy--deepinfra-model-display m)))
      models)))
 
-(defun vscode-cp-proxy-set-gptel-deepinfra-flex-backend (prefix)
-  "Set `gptel-backend' to the DeepInfra flex endpoint.
-
-The endpoint injects \"service_tier\": \"flex\" and \"fail_fast\": true
-into the request body before forwarding it to DeepInfra.
+(defun vscode-cp-proxy-select-deepinfra-flex-model ()
+  "Prompt for a DeepInfra flex capable model and return its id.
 
 Models are discovered from `vscode-cp-proxy-deepinfra-models-url' and
 filtered to text generation models that carry the \"flex\" tag and are
 neither replaced nor deprecated.
 
-With PREFIX, disable streaming."
-  (interactive "P")
-
-  (let* ((token (call-interactively 'vscode-cp-proxy-set-token))
-         (models (vscode-cp-proxy-deepinfra-flex-models))
+The caller is responsible for building the backend object from the
+returned model id."
+  (let* ((models (vscode-cp-proxy-deepinfra-flex-models))
          (model-displays (sort (seq-map #'cdr models) #'string<))
          (display-width (apply #'max 0 (seq-map #'length model-displays)))
          (model-displays (seq-map
                           (lambda (d) (format (format "%%-%ds" display-width) d))
-                          model-displays)))
-    (let* ((selection (completing-read "Select model: " model-displays nil t))
-           (selected-id (car (rassoc (string-trim-right selection) models))))
-      (setq gptel-model (intern selected-id)))
-    (setq
-     gptel-backend
-     (gptel-make-openai "gptel-vscode-cp-proxy-deepinfra-flex"
-       :host (format "%s:%s" vscode-cp-proxy-host vscode-cp-proxy-port)
-       :protocol "http"
-       :endpoint "/deepinfra/flex/openai/v1/chat/completions"
-       :stream (not prefix)
-       :key 'vscode-cp-proxy-set-token
-       :models (seq-map
-                (lambda (m)
-                  `(,(intern (car m))
-                    :description
-                    ""
-                    :capabilities (media tool json url)
-                    :mime-types
-                    ("image/jpeg" "image/png" "image/gif" "image/webp")))
-                models)))))
+                          model-displays))
+         (selection (completing-read "Select model: " model-displays nil t)))
+    (car (rassoc (string-trim-right selection) models))))
 
 (provide 'vscode-cp-proxy)
 

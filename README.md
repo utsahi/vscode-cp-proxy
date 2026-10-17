@@ -24,16 +24,15 @@ token using command setToken provided by this extension by pressing
       1. Pass-through proxy to https://api.deepinfra.com/v1/openai/chat/completions.
       2. Injects `"service_tier": "flex"` and `"fail_fast": true` into the
          JSON body before forwarding.
-      3. Only the request body is read from the incoming request. All
-         other request data is fixed: the target host, path, and headers
-         are set by the extension. The incoming Authorization header and
-         any other incoming headers are never forwarded.
+      3. Forwards the incoming Authorization header as is. The target
+         host and path are fixed by the extension. Other incoming
+         headers are never forwarded.
       4. Streams the upstream response back to the client unchanged.
-      5. Uses the DeepInfra token from the secret store. Run command
-         `vscodeCpProxy.setDeepInfraToken` to set it, or
-         `vscodeCpProxy.clearDeepInfraToken` to clear it. The incoming
-         Authorization header is never forwarded. When no token is set,
-         the request is rejected with HTTP 400.
+      5. The proxy token gate does not apply to this endpoint. The
+         incoming Authorization header carries the DeepInfra API key,
+         so it cannot also carry the proxy token. When the incoming
+         request has no Authorization header, the request is rejected
+         with HTTP 400.
 
 ## Use with Emacs
 

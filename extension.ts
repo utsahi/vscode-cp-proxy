@@ -53,33 +53,6 @@ export async function activate(context: vscode.ExtensionContext) {
     });
     context.subscriptions.push(clearTokenCommand);
 
-    const deepInfraSecretKey = "deepinfraToken";
-    let deepInfraToken = '';
-
-    let setDeepInfraTokenCommand = vscode.commands.registerCommand('vscodeCpProxy.setDeepInfraToken', async () => {
-        const inputToken = await vscode.window.showInputBox({
-            placeHolder: 'Enter the DeepInfra API key.',
-            prompt: 'Enter the DeepInfra API key used for the flex endpoint.',
-            ignoreFocusOut: true,
-            password: true
-        });
-        if (inputToken) {
-            await secrets.store(deepInfraSecretKey, inputToken);
-            deepInfraToken = inputToken;
-            vscode.window.showInformationMessage('DeepInfra token set successfully.');
-        }
-        tracer.info(deepInfraToken ? 'DeepInfra token is set.' : 'DeepInfra token is not set.');
-    });
-    context.subscriptions.push(setDeepInfraTokenCommand);
-
-    let clearDeepInfraTokenCommand = vscode.commands.registerCommand('vscodeCpProxy.clearDeepInfraToken', async () => {
-        await secrets.delete(deepInfraSecretKey);
-        deepInfraToken = '';
-        vscode.window.showInformationMessage('DeepInfra token cleared successfully.');
-        tracer.info('DeepInfra token is not set.');
-    });
-    context.subscriptions.push(clearDeepInfraTokenCommand);
-    
     server = http.createServer((req, res) => {
 
         res.setHeader('Content-Type', 'text/plain; charset=utf-8');
@@ -87,7 +60,7 @@ export async function activate(context: vscode.ExtensionContext) {
         const authHeader = req.headers['authorization'];
         const expectedToken = `Bearer ${token}`;
 
-        if (!authHeader || authHeader !== expectedToken) {
+        if (req.url !== DEEPINFRA_FLEX_PATH && (!authHeader || authHeader !== expectedToken)) {
             tracer.error('Authentication failed');
             res.statusCode = 401;
             res.setHeader('WWW-Authenticate', 'Bearer');
@@ -97,7 +70,7 @@ export async function activate(context: vscode.ExtensionContext) {
        
         tracer.info(req.url ?? "NO URL!");
         if (req.url === DEEPINFRA_FLEX_PATH) {
-            handleDeepInfraFlexRequest(req, res, tracer, { apiKey: deepInfraToken });
+            handleDeepInfraFlexRequest(req, res, tracer);
         } else if (req.url === '/openai/v1/chat/completions') {
             const chunks: Buffer[] = [];
             req.on('data', (chunk) => {
@@ -187,9 +160,6 @@ export async function activate(context: vscode.ExtensionContext) {
         let secretToken = await secrets.get(secretTokenKey);
         tokenFromSecretStorage = secretToken ? true : false;
         token = config.get<string>('token')?.trim() || secretToken || defaultTokenFactory();
-
-        deepInfraToken = (await secrets.get(deepInfraSecretKey)) ?? '';
-        tracer.info(deepInfraToken ? 'DeepInfra token loaded from the secret store.' : 'DeepInfra token is not set. The incoming Authorization header is forwarded as is.');
 
         server.listen(PORT, HOST, traceEndpointInfo);
 

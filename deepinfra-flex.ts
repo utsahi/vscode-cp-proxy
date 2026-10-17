@@ -22,10 +22,6 @@ const HOP_BY_HOP_HEADERS = new Set([
     'upgrade',
 ]);
 
-export interface DeepInfraFlexOptions {
-    apiKey?: string;
-}
-
 function readBody(req: http.IncomingMessage, tracer: ITracingOutputChannel): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const chunks: Buffer[] = [];
@@ -37,11 +33,11 @@ function readBody(req: http.IncomingMessage, tracer: ITracingOutputChannel): Pro
     });
 }
 
-function buildForwardHeaders(bodyLength: number, apiKey: string): http.OutgoingHttpHeaders {
+function buildForwardHeaders(bodyLength: number, authorization: string): http.OutgoingHttpHeaders {
     return {
         'content-type': 'application/json',
         'accept': 'application/json',
-        'authorization': 'Bearer ' + apiKey,
+        'authorization': authorization,
         'content-length': bodyLength,
     };
 }
@@ -85,8 +81,7 @@ function injectExtraOptions(
 export function handleDeepInfraFlexRequest(
     req: http.IncomingMessage,
     res: http.ServerResponse,
-    tracer: ITracingOutputChannel,
-    options: DeepInfraFlexOptions = {}
+    tracer: ITracingOutputChannel
 ): void {
     tracer.info(`DeepInfra flex request received: ${req.method ?? 'UNKNOWN'} ${req.url ?? 'NO URL'}`);
     tracer.debug(() => 'Incoming headers: ' + JSON.stringify(redactHeaders(req.headers)));
@@ -98,11 +93,11 @@ export function handleDeepInfraFlexRequest(
         return;
     }
 
-    const apiKey = options.apiKey?.trim();
-    if (!apiKey) {
-        tracer.error('DeepInfra token is not set. Run command vscodeCpProxy.setDeepInfraToken to set it.');
+    const authorization = req.headers['authorization'];
+    if (!authorization) {
+        tracer.error('The incoming request has no Authorization header. The flex endpoint forwards it as is.');
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('DeepInfra token is not set. Run command vscodeCpProxy.setDeepInfraToken to set it.', 'utf8');
+        res.end('The incoming request has no Authorization header.', 'utf8');
         return;
     }
 
@@ -111,7 +106,7 @@ export function handleDeepInfraFlexRequest(
         const modifiedBody = injectExtraOptions(body, EXTRA_OPTIONS, tracer);
         tracer.info(`Outgoing body length ${modifiedBody.length} bytes. Injected options: ${Object.keys(EXTRA_OPTIONS).join(', ')}`);
 
-        const headers = buildForwardHeaders(modifiedBody.length, apiKey);
+        const headers = buildForwardHeaders(modifiedBody.length, authorization);
         const requestOptions = {
             hostname: UPSTREAM_HOST,
             port: 443,
