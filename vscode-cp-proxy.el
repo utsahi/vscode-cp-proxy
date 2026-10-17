@@ -124,6 +124,154 @@ set a token in VS Code.
                 model-ids)
        ))))
 
+(defcustom vscode-cp-proxy-deepinfra-models-url
+  "https://api.deepinfra.com/models/list"
+  "URL of the DeepInfra model list endpoint."
+  :type 'string
+  :group 'vscode-cp-proxy)
+
+(defun vscode-cp-proxy--deepinfra-absent-p (value)
+  "Return non-nil if VALUE is absent in a `json-parse-buffer' result.
+
+`json-parse-buffer' represents JSON null as `:null' and JSON false as
+`:false', so a plain `null' check is not sufficient."
+  (or (null value) (eq value :null) (eq value :false)))
+
+(defun vscode-cp-proxy--deepinfra-flex-p (model)
+  "Return non-nil if MODEL is a flex capable text generation model."
+  (and (equal (gethash "type" model) "text-generation")
+       (seq-contains-p (gethash "tags" model) "flex")
+       (vscode-cp-proxy--deepinfra-absent-p (gethash "replaced_by" model))
+       (vscode-cp-proxy--deepinfra-absent-p (gethash "deprecated" model))))
+
+(defun vscode-cp-proxy--deepinfra-flex-savings (pricing)
+  "Return the flex savings percentage string from PRICING, or nil."
+  (let ((priority (gethash "rate_per_service_tier_priority" pricing))
+        (flex (gethash "rate_per_service_tier_flex" pricing)))
+    (when (and (numberp priority) (numberp flex) (> priority 0))
+      (format "%d%% flex savings" (round (* 100 (/ (- priority flex) priority)))))))
+
+(defun vscode-cp-proxy--deepinfra-format-days-ago (value)
+  "Return the age of the ISO 8601 timestamp VALUE as \"NNNN day(s) ago\".
+
+Returns an empty string when VALUE is absent or not a timestamp."
+  (if (and (stringp value) (string-match "\\`\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)" value))
+      (let ((days (- (time-to-days (current-time))
+                     (time-to-days (date-to-time (match-string 1 value))))))
+        (format "%04d day%s ago" days (if (= days 1) "" "s")))
+      ""))
+
+(defun vscode-cp-proxy--deepinfra-format-date (value)
+  "Return the YYYY-MM-DD part of the ISO 8601 timestamp VALUE.
+
+Returns an empty string when VALUE is absent or not a timestamp."
+  (if (and (stringp value) (string-match "\\`\\([0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\)" value))
+      (match-string 1 value)
+      ""))
+
+(defun vscode-cp-proxy--deepinfra-format-price (value)
+  "Format VALUE as a plain decimal price string.
+
+Emacs prints small floats in scientific notation, for example 9e-06.
+This function expands them to a plain decimal, for example 0.000009,
+and removes trailing zeros."
+  (let ((text (format "%0.8f" value)))
+    (when (string-match "\\." text)
+      (setq text (string-remove-suffix "." (string-remove-suffix "0" (replace-regexp-in-string "0+\\'" "" text)))))
+    text))
+
+(defun vscode-cp-proxy--deepinfra-model-display (model)
+  "Return a display string for MODEL."
+  (let* ((name (gethash "model_name" model))
+         (tags (gethash "tags" model))
+         (pricing (gethash "pricing" model))
+         (discount (gethash "discount" pricing))
+         (max-tokens (gethash "max_tokens" model))
+         (quantization (gethash "quantization" model))
+         (input (gethash "cents_per_input_token" pricing))
+         (output (gethash "cents_per_output_token" pricing))
+         (cached (gethash "rate_per_input_token_cached" pricing))
+         (savings (vscode-cp-proxy--deepinfra-flex-savings pricing))
+         (create-ts (gethash "create_ts" model))
+         (parts (list (vscode-cp-proxy--deepinfra-format-days-ago create-ts)
+                      (format "%s" name)
+                      (format "(featured=%s)" (if (seq-contains-p tags "featured") "true" "false"))
+                      (format "(partner=%s)" (if (eq (gethash "is_partner" model) t) "true" "false")))))
+    (when (numberp discount)
+      (setq parts (append parts (list (format "(%d%% discount)" (round (* 100 discount)))))))
+    (when savings
+      (setq parts (append parts (list (format "(%s)" savings)))))
+    (when (numberp max-tokens)
+      (setq parts (append parts (list (format "(max_tokens=%s)" max-tokens)))))
+    (when (and quantization (not (vscode-cp-proxy--deepinfra-absent-p quantization)))
+      (setq parts (append parts (list (format "(quant=%s)" quantization)))))
+    (when (numberp input)
+      (setq parts (append parts (list (format "input $%s" (vscode-cp-proxy--deepinfra-format-price input))))))
+    (when (numberp output)
+      (setq parts (append parts (list (format "output $%s" (vscode-cp-proxy--deepinfra-format-price output))))))
+    (when (numberp cached)
+      (setq parts (append parts (list (format "cache %s" (vscode-cp-proxy--deepinfra-format-price cached))))))
+    (setq parts (append parts (list (vscode-cp-proxy--deepinfra-format-date create-ts))))
+    (mapconcat #'identity parts " ")))
+
+(defun vscode-cp-proxy-deepinfra-flex-models ()
+  "Fetch and filter the DeepInfra model list for flex capable models.
+
+Returns a list of (MODEL-NAME . DISPLAY) pairs."
+  (let* ((json
+          (with-current-buffer
+              (url-retrieve-synchronously vscode-cp-proxy-deepinfra-models-url)
+            (beginning-of-buffer)
+            (search-forward-regexp "\r?\n\r?\n")
+            (json-parse-buffer)))
+         (models (seq-filter #'vscode-cp-proxy--deepinfra-flex-p (append json nil))))
+    (seq-map
+     (lambda (m)
+       (cons (gethash "model_name" m)
+             (vscode-cp-proxy--deepinfra-model-display m)))
+     models)))
+
+(defun vscode-cp-proxy-set-gptel-deepinfra-flex-backend (prefix)
+  "Set `gptel-backend' to the DeepInfra flex endpoint.
+
+The endpoint injects \"service_tier\": \"flex\" and \"fail_fast\": true
+into the request body before forwarding it to DeepInfra.
+
+Models are discovered from `vscode-cp-proxy-deepinfra-models-url' and
+filtered to text generation models that carry the \"flex\" tag and are
+neither replaced nor deprecated.
+
+With PREFIX, disable streaming."
+  (interactive "P")
+
+  (let* ((token (call-interactively 'vscode-cp-proxy-set-token))
+         (models (vscode-cp-proxy-deepinfra-flex-models))
+         (model-displays (sort (seq-map #'cdr models) #'string<))
+         (display-width (apply #'max 0 (seq-map #'length model-displays)))
+         (model-displays (seq-map
+                          (lambda (d) (format (format "%%-%ds" display-width) d))
+                          model-displays)))
+    (let* ((selection (completing-read "Select model: " model-displays nil t))
+           (selected-id (car (rassoc (string-trim-right selection) models))))
+      (setq gptel-model (intern selected-id)))
+    (setq
+     gptel-backend
+     (gptel-make-openai "gptel-vscode-cp-proxy-deepinfra-flex"
+       :host (format "%s:%s" vscode-cp-proxy-host vscode-cp-proxy-port)
+       :protocol "http"
+       :endpoint "/deepinfra/flex/openai/v1/chat/completions"
+       :stream (not prefix)
+       :key 'vscode-cp-proxy-set-token
+       :models (seq-map
+                (lambda (m)
+                  `(,(intern (car m))
+                    :description
+                    ""
+                    :capabilities (media tool json url)
+                    :mime-types
+                    ("image/jpeg" "image/png" "image/gif" "image/webp")))
+                models)))))
+
 (provide 'vscode-cp-proxy)
 
 ;;; vscode-cp-proxy.el ends here

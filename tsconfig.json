@@ -10,6 +10,6 @@
         "skipLibCheck": true,
         "types": ["node"]
     },
-    "include": ["extension.ts", "payload-schema.ts", "tracer.ts"],
+    "include": ["extension.ts", "payload-schema.ts", "tracer.ts", "deepinfra-flex.ts"],
     "exclude": ["node_modules", "**/*.test.ts"]
 }

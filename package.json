@@ -51,6 +51,14 @@
             {
                 "command": "vscodeCpProxy.clearToken",
                 "title": "VS Code CP Proxy: Clear Token"
+            },
+            {
+                "command": "vscodeCpProxy.setDeepInfraToken",
+                "title": "VS Code CP Proxy: Set DeepInfra Token"
+            },
+            {
+                "command": "vscodeCpProxy.clearDeepInfraToken",
+                "title": "VS Code CP Proxy: Clear DeepInfra Token"
             }
         ]
     },
