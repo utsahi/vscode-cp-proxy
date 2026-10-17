@@ -1,7 +1,7 @@
 {
     "name": "vscode-cp-proxy",
     "displayName": "VSCode CP Proxy",
-    "publisher": "KishorDatar", 
+    "publisher": "KishorDatar",
     "version": "0.0.13",
     "engines": {
         "vscode": ">=1.80.0"
@@ -60,15 +60,14 @@
     "scripts": {
         "build": "tsc"
     },
-    "extensionDependencies": [
-    ],
+    "extensionDependencies": [],
     "devDependencies": {
-        "@vscode/vsce": "^3.6.0",
         "@types/node": "^24.0.13",
-        "@types/vscode": "^1.80.0"
+        "@types/vscode": "^1.80.0",
+        "@vscode/vsce": "^4.0.0"
     },
     "repository": {
-    "type": "git",
-    "url": "git+https://github.com/utsahi/vscode-cp-proxy.git"
-  }
+        "type": "git",
+        "url": "git+https://github.com/utsahi/vscode-cp-proxy.git"
+    }
 }
