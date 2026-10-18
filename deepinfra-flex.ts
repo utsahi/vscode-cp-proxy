@@ -6,6 +6,7 @@ export const DEEPINFRA_FLEX_PATH = '/deepinfra/flex/openai/v1/chat/completions';
 
 const UPSTREAM_HOST = 'api.deepinfra.com';
 const UPSTREAM_PATH = '/v1/openai/chat/completions';
+const UPSTREAM_IDLE_TIMEOUT_MS = 300_000;
 const EXTRA_OPTIONS: Record<string, unknown> = {
     service_tier: 'flex',
     fail_fast: true,
@@ -147,6 +148,11 @@ export function handleDeepInfraFlexRequest(
                 tracer.debug(() => 'Upstream TLS handshake complete. Authorized: ' + socket.authorized
                     + (socket.authorizationError ? ', error: ' + String(socket.authorizationError) : ''));
             });
+        });
+
+        upstream.setTimeout(UPSTREAM_IDLE_TIMEOUT_MS, () => {
+            tracer.error(`Upstream was idle for ${UPSTREAM_IDLE_TIMEOUT_MS} ms. Aborting the request.`);
+            upstream.destroy(new Error(`Upstream idle timeout after ${UPSTREAM_IDLE_TIMEOUT_MS} ms`));
         });
 
         upstream.on('error', (err) => {

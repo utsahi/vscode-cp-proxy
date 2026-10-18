@@ -92,8 +92,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
                     res.writeHead(200, {
                         'Content-Type': payload.stream ? 'text/event-stream; charset=utf-8' : 'text/plain; charset=utf-8',
-                        'Cache-Control': 'no-cache',
-                        'Connection': 'keep-alive'
+                        'Cache-Control': 'no-cache'
                     });
                     wroteHead = true;
 
